@@ -21,6 +21,6 @@ class JsonPlaceholderFirstTests {
         
         assertThat(post["id"]).isEqualTo(1)
         assertThat(post["title"]).isNotNull()
-        println("✅ First test passed! Post title: ${post["title"]}")
+        println("✅ First test passed! Ура!!! Post title: ${post["title"]}")
     }
 }

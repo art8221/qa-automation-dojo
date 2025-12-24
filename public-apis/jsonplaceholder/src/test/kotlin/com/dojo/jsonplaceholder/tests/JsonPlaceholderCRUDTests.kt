@@ -30,6 +30,6 @@ class JsonPlaceholderCRUDTests {
         
         assertThat(response.jsonPath().getInt("id")).isGreaterThan(0)
         assertThat(response.jsonPath().getString("title")).isEqualTo("Test Post")
-        println("✅ POST test passed! Created post with ID: ${response.jsonPath().getInt("id")}")
+        println("✅ POST test passed! Ура!!! Created post with ID: ${response.jsonPath().getInt("id")}")
     }
 }
