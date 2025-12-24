@@ -4,6 +4,11 @@ build/
 out/
 bin/
 
+# о  игнорируем wrapper файлы!
+!gradle/wrapper/
+!gradlew
+!gradlew.bat
+
 # IntelliJ IDEA
 .idea/
 *.iml
@@ -16,14 +21,12 @@ logs/
 
 # System files
 .DS_Store
-Thumbs.db
 
-# Local configuration
-# Application properties
+# Application properties (можно игнорировать)
 *.properties
+# о исключаем важные properties файлы
 !gradle.properties
 !gradle/wrapper/gradle-wrapper.properties
-!gradle.properties
 
 # Test reports
 test-results/
