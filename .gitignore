@@ -1,4 +1,4 @@
-# Gradle
+﻿# Gradle
 .gradle/
 build/
 out/
@@ -19,7 +19,10 @@ logs/
 Thumbs.db
 
 # Local configuration
+# Application properties
 *.properties
+!gradle.properties
+!gradle/wrapper/gradle-wrapper.properties
 !gradle.properties
 
 # Test reports
