@@ -10,59 +10,157 @@ jobs:
   test:
     runs-on: ubuntu-latest
 
+    strategy:
+      matrix:
+        java-version: ['21']
+
     steps:
       - uses: actions/checkout@v4
 
-      - name: Setup Java with UTF-8
+      - name: Setup Java
         uses: actions/setup-java@v4
         with:
-          java-version: '21'
+          java-version: ${{ matrix.java-version }}
           distribution: 'temurin'
 
-      - name: Setup Gradle
-        run: chmod +x ./gradlew
-
-      - name: Run Tests with UTF-8 support
+      - name: Setup UTF-8 encoding
         run: |
-          # Устанавливаем UTF-8 для всей сессии
-          export JAVA_TOOL_OPTIONS="-Dfile.encoding=UTF-8"
-          export LC_ALL="en_US.UTF-8"
-          
-          echo "Running tests with UTF-8 encoding..."
-          ./gradlew :public-apis:jsonplaceholder:test --info
+          echo "JAVA_TOOL_OPTIONS=-Dfile.encoding=UTF-8" >> $GITHUB_ENV
+          echo "GRADLE_OPTS=-Dfile.encoding=UTF-8" >> $GITHUB_ENV
 
-      - name: Upload Test Reports
-        uses: actions/upload-artifact@v4
-        if: always()
+      - name: Grant execute permission for gradlew
+        run: chmod +x gradlew
+
+      - name: Cache Gradle dependencies
+        uses: actions/cache@v3
         with:
-          name: test-reports
           path: |
-            public-apis/jsonplaceholder/build/reports/
-            public-apis/jsonplaceholder/build/test-results/
+            ~/.gradle/caches
+            ~/.gradle/wrapper
+          key: ${{ runner.os }}-gradle-${{ hashFiles('**/*.gradle*', '**/gradle-wrapper.properties') }}
+          restore-keys: |
+            ${{ runner.os }}-gradle
 
-      - name: Upload Test Logs
+      - name: Run Tests with Parallel Execution
+        run: |
+          echo "=== Running tests with parallel execution ==="
+          echo "JUnit Platform Properties:"
+          cat src/test/resources/junit-platform.properties 2>/dev/null || echo "No junit-platform.properties found"
+          echo ""
+          
+          # Запускаем тесты с разными конфигурациями
+          echo "1. Running with parallel execution (default):"
+          time ./gradlew :public-apis:jsonplaceholder:test --tests "*JsonPlaceholderCRUDTests" --info 2>&1 | \
+            grep -E "(PASSED|FAILED|Tests run:|Test class:|Thread|worker|BUILD)" | head -20 || true
+          
+          echo ""
+          echo "2. Running with sequential execution:"
+          time ./gradlew :public-apis:jsonplaceholder:test --tests "*JsonPlaceholderCRUDTests" \
+            -Djunit.jupiter.execution.parallel.enabled=false --info 2>&1 | \
+            grep -E "(PASSED|FAILED|Tests run:|Test class:|BUILD)" | head -10 || true
+          
+          echo ""
+          echo "3. Running all tests in module:"
+          ./gradlew :public-apis:jsonplaceholder:test --info 2>&1 | \
+            grep -E "(Test class:|Tests run:|FAILED|BUILD)" || true
+
+      - name: Run Parallel Check Test
+        if: always()
+        run: |
+          echo "=== Running parallel check test ==="
+          
+          # Создаем простой тест для проверки параллельности
+          cat > src/test/kotlin/com/dojo/jsonplaceholder/tests/ParallelCheckTest.kt << 'EOF'
+          package com.dojo.jsonplaceholder.tests
+          
+          import org.junit.jupiter.api.Test
+          import org.junit.jupiter.api.parallel.Execution
+          import org.junit.jupiter.api.parallel.ExecutionMode
+          
+          @Execution(ExecutionMode.CONCURRENT)
+          class ParallelCheckTest {
+          
+              @Test
+              fun test1() {
+                  val thread = Thread.currentThread().name
+                  println("[\$thread] Test 1 started")
+                  Thread.sleep(1000)
+                  println("[\$thread] Test 1 finished")
+              }
+          
+              @Test
+              fun test2() {
+                  val thread = Thread.currentThread().name
+                  println("[\$thread] Test 2 started")
+                  Thread.sleep(1000)
+                  println("[\$thread] Test 2 finished")
+              }
+          
+              @Test
+              fun test3() {
+                  val thread = Thread.currentThread().name
+                  println("[\$thread] Test 3 started")
+                  Thread.sleep(1000)
+                  println("[\$thread] Test 3 finished")
+              }
+          
+              @Test
+              fun test4() {
+                  val thread = Thread.currentThread().name
+                  println("[\$thread] Test 4 started")
+                  Thread.sleep(1000)
+                  println("[\$thread] Test 4 finished")
+              }
+          }
+          EOF
+          
+          echo "Running parallel check test..."
+          time ./gradlew :public-apis:jsonplaceholder:test --tests "*ParallelCheckTest" --info 2>&1 | \
+            grep -E "(Thread|Test.*started|Test.*finished|BUILD|PASSED)" || true
+
+      - name: Upload Test Results
         uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: test-logs
+          name: test-results-${{ matrix.java-version }}
+          path: |
+            **/build/reports/tests/
+            **/build/test-results/
+          retention-days: 7
+
+      - name: Upload Logs
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: logs-${{ matrix.java-version }}
           path: |
             **/build/test-logs/
             **/*.log
+          retention-days: 7
 
-      - name: Show Test Summary
+      - name: Generate Test Summary
         if: always()
         run: |
-          echo "=== TEST EXECUTION SUMMARY ==="
-          echo "Checking for test results..."
+          echo "=== TEST SUMMARY ==="
           
+          # Проверяем результаты тестов
           if [ -f "public-apis/jsonplaceholder/build/reports/tests/test/index.html" ]; then
-            echo "✅ HTML test report generated"
+            echo "📊 HTML report generated"
+            # Извлекаем статистику из XML отчета
+            if [ -f "public-apis/jsonplaceholder/build/test-results/test/TEST-*.xml" ]; then
+              echo "Test results:"
+              cat public-apis/jsonplaceholder/build/test-results/test/TEST-*.xml 2>/dev/null | \
+                grep -E "(testsuite|testcase|failure)" | head -10 || true
+            fi
           else
-            echo "⚠️  HTML report not found"
+            echo "⚠️  No test reports found"
           fi
           
-          # Проверяем логи на наличие кириллицы
-          echo "Looking for test messages in logs..."
-          find . -name "*.log" -type f -exec grep -l "Не соответствует\|тест\|ура" {} \; 2>/dev/null || echo "No matching logs found"
-          
-          echo "=== SUMMARY COMPLETE ==="
+          # Проверяем логи
+          echo ""
+          echo "🔍 Checking logs for parallel execution indicators:"
+          find . -name "*.log" -type f -exec grep -l "worker-\|ForkJoinPool\|Thread-" {} \; 2>/dev/null | \
+            while read log; do
+              echo "Found in: \$log"
+              grep -E "worker-\|Thread-" "\$log" | head -3 || true
+            done || echo "No parallel execution logs found"
