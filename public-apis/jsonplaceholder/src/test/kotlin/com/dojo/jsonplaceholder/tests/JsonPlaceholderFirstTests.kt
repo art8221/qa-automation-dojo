@@ -3,8 +3,9 @@
 import io.restassured.RestAssured.given
 import io.restassured.http.ContentType.JSON
 import jdk.jfr.Description
-import org.junit.jupiter.api.Assertions
 import org.junit.jupiter.api.Test
+import org.junit.jupiter.api.Assertions.assertEquals
+import org.junit.jupiter.api.assertAll
 
 class JsonPlaceholderFirstTests {
 
@@ -21,10 +22,18 @@ class JsonPlaceholderFirstTests {
             .extract()
             .`as`(Map::class.java)
 
-        val expectedId = 1
+        val expectedId = 12
+
         val expectedTitle = "Test Get"
 
-        Assertions.assertEquals(expectedId, post["id"], "Не соответствует!!!")
-        Assertions.assertEquals(expectedTitle, post["title"], "Не соответствует2!!!")
+        assertAll(
+            "Проверки данных поста",
+            { assertEquals(expectedId, post["id"], "ID не соответствует ожидаемому, " +
+                    "ожидается - '$expectedId'," +
+                    "фактически - '${post["id"]}'") },
+            { assertEquals(expectedTitle, post["title"], "Заголовок не соответствует ожидаемому, " +
+                    "ожидается - '$expectedTitle'," +
+                    "фактически - '${post["title"]}'") }
+        )
     }
 }

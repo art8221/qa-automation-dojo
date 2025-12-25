@@ -1,5 +1,6 @@
 plugins {
     kotlin("jvm")
+    id("io.qameta.allure") version "2.12.0"
 }
 
 kotlin {
@@ -16,6 +17,21 @@ dependencies {
     testImplementation("com.fasterxml.jackson.module:jackson-module-kotlin:2.15.2")
     testImplementation("ch.qos.logback:logback-classic:1.4.11")
     testImplementation("org.slf4j:slf4j-api:2.0.9")
+
+    // Allure
+    testImplementation("io.qameta.allure:allure-junit5:2.27.0")
+    testImplementation("io.qameta.allure:allure-rest-assured:2.27.0")
+}
+
+allure {
+    version.set("2.27.0")
+    adapter {
+        frameworks {
+            junit5 {
+                adapterVersion.set("2.27.0")
+            }
+        }
+    }
 }
 
 // 🔧 КОДИРОВКА
