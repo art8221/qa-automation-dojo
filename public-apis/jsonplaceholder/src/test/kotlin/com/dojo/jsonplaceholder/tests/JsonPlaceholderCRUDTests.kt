@@ -1,9 +1,18 @@
-﻿import io.qameta.allure.Description
-import io.restassured.RestAssured.given
-import io.restassured.http.ContentType.JSON
-import org.junit.jupiter.api.Assertions
-import org.junit.jupiter.api.Test
+﻿package com.dojo.jsonplaceholder.tests
 
+import com.dojo.jsonplaceholder.annotations.ParallelApiTest
+import io.qameta.allure.Description
+import io.restassured.RestAssured
+import io.restassured.http.ContentType
+import org.junit.jupiter.api.Assertions.assertEquals
+import org.junit.jupiter.api.Test
+import org.junit.jupiter.api.TestInstance
+import org.junit.jupiter.api.parallel.Execution
+import org.junit.jupiter.api.parallel.ExecutionMode
+
+@ParallelApiTest
+@TestInstance(TestInstance.Lifecycle.PER_CLASS)
+@Execution(ExecutionMode.CONCURRENT)
 class JsonPlaceholderCRUDTests {
 
     @Test
@@ -15,13 +24,11 @@ class JsonPlaceholderCRUDTests {
             "body": "This is a test post created by automation",
             "userId": 1
         }
-    """.trimIndent()
+        """.trimIndent()
 
-        val response = given()
-            .baseUri("https://jsonplaceholder.typicode.com")
-            .contentType(JSON)
+        val response = RestAssured.given()
+            .contentType(ContentType.JSON)
             .body(requestBody)
-            .filter(io.qameta.allure.restassured.AllureRestAssured())
             .`when`()
             .post("/posts")
             .then()
@@ -30,22 +37,55 @@ class JsonPlaceholderCRUDTests {
             .response()
 
         val expectedId = 101
-        val expectedTitle = "Test Get"
+        val expectedTitle = "Test Post"
 
-        Assertions.assertEquals(
-            response.jsonPath().getInt("id"),
-            expectedId,
-            "Id не соответствует ожидаемому, " +
-                    "ожидаем - '$expectedId', " +
-                    "фактически - '${response.jsonPath().getInt("id")}'"
+        assertEquals(expectedId, response.jsonPath().getInt("id"),
+            "Id не соответствует ожидаемому"
         )
 
-        Assertions.assertEquals(
-            response.jsonPath().getString("title"),
-            expectedTitle,
-            "Заголовок не соответствует ожидаемому, " +
-                    "ожидаем - '$expectedTitle', " +
-                    "фактически - '${response.jsonPath().getString("title")}'"
+        assertEquals(expectedTitle, response.jsonPath().getString("title"),
+            "Заголовок не соответствует ожидаемому"
         )
+    }
+
+    @Test
+    @Description("GET: Получение существующего поста должно вернуть 200")
+    fun `GET existing post should return 200`() {
+        RestAssured.given()
+            .`when`()
+            .get("/posts/1")
+            .then()
+            .statusCode(200)
+    }
+
+    @Test
+    @Description("PUT: Обновление поста должно вернуть 200")
+    fun `PUT update post should return 200`() {
+        val requestBody = """
+        {
+            "title": "Updated Post",
+            "body": "Updated content",
+            "userId": 1,
+            "id": 1
+        }
+        """.trimIndent()
+
+        RestAssured.given()
+            .contentType(ContentType.JSON)
+            .body(requestBody)
+            .`when`()
+            .put("/posts/1")
+            .then()
+            .statusCode(200)
+    }
+
+    @Test
+    @Description("DELETE: Удаление поста должно вернуть 200")
+    fun `DELETE post should return 200`() {
+        RestAssured.given()
+            .`when`()
+            .delete("/posts/1")
+            .then()
+            .statusCode(200)
     }
 }

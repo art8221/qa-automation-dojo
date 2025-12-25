@@ -22,9 +22,9 @@ class JsonPlaceholderFirstTests {
             .extract()
             .`as`(Map::class.java)
 
-        val expectedId = 12
+        val expectedId = 1
 
-        val expectedTitle = "Test Get"
+        val expectedTitle = "sunt aut facere repellat provident occaecati excepturi optio reprehenderit"
 
         assertAll(
             "Проверки данных поста",

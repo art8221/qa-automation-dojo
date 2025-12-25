@@ -15,12 +15,14 @@ dependencies {
     testImplementation("io.rest-assured:kotlin-extensions:5.3.0")
     testImplementation("com.fasterxml.jackson.core:jackson-databind:2.15.2")
     testImplementation("com.fasterxml.jackson.module:jackson-module-kotlin:2.15.2")
-    testImplementation("ch.qos.logback:logback-classic:1.4.11")
-    testImplementation("org.slf4j:slf4j-api:2.0.9")
 
     // Allure
     testImplementation("io.qameta.allure:allure-junit5:2.27.0")
     testImplementation("io.qameta.allure:allure-rest-assured:2.27.0")
+
+    //logging
+    testImplementation("ch.qos.logback:logback-classic:1.4.14")
+    testImplementation("org.slf4j:slf4j-api:2.0.9")
 }
 
 allure {
