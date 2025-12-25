@@ -1,0 +1,33 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<configuration>
+    <!-- Console appender с цветами -->
+    <appender name="CONSOLE" class="ch.qos.logback.core.ConsoleAppender">
+        <encoder>
+            <pattern>%d{HH:mm:ss.SSS} %highlight(%-5level) %cyan(%logger{20}) - %msg%n</pattern>
+        </encoder>
+    </appender>
+
+    <!-- File appender для CI -->
+    <appender name="FILE" class="ch.qos.logback.core.FileAppender">
+        <file>${user.dir}/build/test-logs/test.log</file>
+        <encoder>
+            <pattern>%d{yyyy-MM-dd HH:mm:ss.SSS} [%thread] %-5level %logger{36} - %msg%n</pattern>
+        </encoder>
+    </appender>
+
+    <!-- Наши тесты - всегда INFO, можно повысить через системную пропертю -->
+    <logger name="com.dojo.jsonplaceholder" level="${logging.level.com.dojo.jsonplaceholder:-INFO}"/>
+
+    <!-- RestAssured - по умолчанию WARN, в verbose режиме DEBUG -->
+    <logger name="io.restassured" level="${logging.level.io.restassured:-WARN}"/>
+
+    <!-- JUnit -->
+    <logger name="org.junit" level="WARN"/>
+    <logger name="org.gradle" level="WARN"/>
+
+    <!-- Корневой логгер -->
+    <root level="INFO">
+        <appender-ref ref="CONSOLE"/>
+        <appender-ref ref="FILE"/>
+    </root>
+</configuration>
