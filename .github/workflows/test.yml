@@ -9,15 +9,15 @@ on:
 jobs:
   test:
     runs-on: ubuntu-latest
-
     strategy:
       matrix:
         java-version: ['21']
 
     steps:
-      - uses: actions/checkout@v4
+      - name: Checkout code
+        uses: actions/checkout@v4
 
-      - name: Setup Java
+      - name: Setup Java ${{ matrix.java-version }}
         uses: actions/setup-java@v4
         with:
           java-version: ${{ matrix.java-version }}
@@ -41,35 +41,48 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-gradle
 
+      - name: Verify JUnit configuration
+        run: |
+          echo "=== Checking JUnit parallel execution configuration ==="
+          if [ -f "src/test/resources/junit-platform.properties" ]; then
+            echo "📋 Found junit-platform.properties:"
+            cat src/test/resources/junit-platform.properties
+          else
+            echo "⚠️  No junit-platform.properties found - using default settings"
+          fi
+          echo ""
+
       - name: Run Tests with Parallel Execution
         run: |
           echo "=== Running tests with parallel execution ==="
-          echo "JUnit Platform Properties:"
-          cat src/test/resources/junit-platform.properties 2>/dev/null || echo "No junit-platform.properties found"
-          echo ""
           
-          # Запускаем тесты с разными конфигурациями
-          echo "1. Running with parallel execution (default):"
-          time ./gradlew :public-apis:jsonplaceholder:test --tests "*JsonPlaceholderCRUDTests" --info 2>&1 | \
-            grep -E "(PASSED|FAILED|Tests run:|Test class:|Thread|worker|BUILD)" | head -20 || true
-          
-          echo ""
-          echo "2. Running with sequential execution:"
-          time ./gradlew :public-apis:jsonplaceholder:test --tests "*JsonPlaceholderCRUDTests" \
-            -Djunit.jupiter.execution.parallel.enabled=false --info 2>&1 | \
-            grep -E "(PASSED|FAILED|Tests run:|Test class:|BUILD)" | head -10 || true
+          # Run tests with parallel execution (default)
+          echo "1. Running with parallel execution:"
+          time ./gradlew :public-apis:jsonplaceholder:test \
+            --tests "*JsonPlaceholderCRUDTests" \
+            --info \
+            --rerun-tasks 2>&1 | \
+            grep -E "(PASSED|FAILED|Tests run:|Test class:|Thread|worker|BUILD|SUCCESSFUL|FAILED)" | \
+            tail -20
           
           echo ""
-          echo "3. Running all tests in module:"
-          ./gradlew :public-apis:jsonplaceholder:test --info 2>&1 | \
-            grep -E "(Test class:|Tests run:|FAILED|BUILD)" || true
+          echo "2. Running with sequential execution for comparison:"
+          time ./gradlew :public-apis:jsonplaceholder:test \
+            --tests "*JsonPlaceholderCRUDTests" \
+            -Djunit.jupiter.execution.parallel.enabled=false \
+            --info 2>&1 | \
+            grep -E "(PASSED|FAILED|Tests run:|Test class:|BUILD|SUCCESSFUL)" | \
+            tail -10
 
       - name: Run Parallel Check Test
         if: always()
         run: |
           echo "=== Running parallel check test ==="
           
-          # Создаем простой тест для проверки параллельности
+          # Create test directory if it doesn't exist
+          mkdir -p src/test/kotlin/com/dojo/jsonplaceholder/tests
+          
+          # Create the parallel test
           cat > src/test/kotlin/com/dojo/jsonplaceholder/tests/ParallelCheckTest.kt << 'EOF'
           package com.dojo.jsonplaceholder.tests
           
@@ -115,52 +128,86 @@ jobs:
           EOF
           
           echo "Running parallel check test..."
-          time ./gradlew :public-apis:jsonplaceholder:test --tests "*ParallelCheckTest" --info 2>&1 | \
-            grep -E "(Thread|Test.*started|Test.*finished|BUILD|PASSED)" || true
+          time ./gradlew :public-apis:jsonplaceholder:test \
+            --tests "*ParallelCheckTest" \
+            --info 2>&1 | \
+            grep -B1 -A1 -E "(Thread|Test.*started|Test.*finished|BUILD|PASSED|FAILED)" || \
+            echo "No output matched the filter"
+          
+          echo ""
+          echo "Parallel check completed"
+
+      - name: Run All Module Tests
+        if: always()
+        run: |
+          echo "=== Running all tests in jsonplaceholder module ==="
+          ./gradlew :public-apis:jsonplaceholder:test \
+            --no-daemon \
+            --info 2>&1 | \
+            grep -E "(Test class:|Tests run:|FAILED|SUCCESSFUL|BUILD)" || \
+            echo "No test output captured"
 
       - name: Upload Test Results
-        uses: actions/upload-artifact@v4
         if: always()
+        uses: actions/upload-artifact@v4
         with:
-          name: test-results-${{ matrix.java-version }}
+          name: test-results-java${{ matrix.java-version }}
           path: |
             **/build/reports/tests/
             **/build/test-results/
           retention-days: 7
 
-      - name: Upload Logs
-        uses: actions/upload-artifact@v4
+      - name: Upload Build Logs
         if: always()
+        uses: actions/upload-artifact@v4
         with:
-          name: logs-${{ matrix.java-version }}
+          name: build-logs-java${{ matrix.java-version }}
           path: |
-            **/build/test-logs/
+            **/build/**/*.log
             **/*.log
           retention-days: 7
 
       - name: Generate Test Summary
         if: always()
         run: |
-          echo "=== TEST SUMMARY ==="
+          echo "📋 === TEST EXECUTION SUMMARY ==="
+          echo ""
           
-          # Проверяем результаты тестов
-          if [ -f "public-apis/jsonplaceholder/build/reports/tests/test/index.html" ]; then
-            echo "📊 HTML report generated"
-            # Извлекаем статистику из XML отчета
-            if [ -f "public-apis/jsonplaceholder/build/test-results/test/TEST-*.xml" ]; then
-              echo "Test results:"
-              cat public-apis/jsonplaceholder/build/test-results/test/TEST-*.xml 2>/dev/null | \
-                grep -E "(testsuite|testcase|failure)" | head -10 || true
+          # Check for test reports
+          if find . -name "TEST-*.xml" -type f | grep -q "."; then
+            echo "✅ Test XML reports found"
+          
+            # Count tests
+            TOTAL_TESTS=$(find . -name "TEST-*.xml" -type f -exec grep -h "testsuite" {} \; | \
+              grep -o 'tests="[0-9]*"' | sed 's/[^0-9]//g' | paste -sd+ | bc)
+            TOTAL_FAILURES=$(find . -name "TEST-*.xml" -type f -exec grep -h "testsuite" {} \; | \
+              grep -o 'failures="[0-9]*"' | sed 's/[^0-9]//g' | paste -sd+ | bc)
+            TOTAL_ERRORS=$(find . -name "TEST-*.xml" -type f -exec grep -h "testsuite" {} \; | \
+              grep -o 'errors="[0-9]*"' | sed 's/[^0-9]//g' | paste -sd+ | bc)
+          
+            echo "📊 Statistics:"
+            echo "   Total tests: ${TOTAL_TESTS:-0}"
+            echo "   Failures: ${TOTAL_FAILURES:-0}"
+            echo "   Errors: ${TOTAL_ERRORS:-0}"
+          
+            if [ "${TOTAL_FAILURES:-0}" -gt 0 ] || [ "${TOTAL_ERRORS:-0}" -gt 0 ]; then
+              echo "❌ Some tests failed or errored"
+            else
+              echo "✅ All tests passed!"
             fi
           else
             echo "⚠️  No test reports found"
           fi
           
-          # Проверяем логи
           echo ""
-          echo "🔍 Checking logs for parallel execution indicators:"
-          find . -name "*.log" -type f -exec grep -l "worker-\|ForkJoinPool\|Thread-" {} \; 2>/dev/null | \
-            while read log; do
-              echo "Found in: \$log"
-              grep -E "worker-\|Thread-" "\$log" | head -3 || true
-            done || echo "No parallel execution logs found"
+          echo "🔍 Parallel execution check:"
+          if find . -name "*.log" -type f -exec grep -l "worker-\|Thread-\|ForkJoinPool" {} \; 2>/dev/null | grep -q "."; then
+            echo "✅ Parallel execution detected in logs"
+          else
+            echo "ℹ️  No parallel execution indicators found in logs"
+          fi
+          
+          echo ""
+          echo "📁 Available artifacts:"
+          echo "   - test-results-java${{ matrix.java-version }} (test reports)"
+          echo "   - build-logs-java${{ matrix.java-version }} (build logs)"
