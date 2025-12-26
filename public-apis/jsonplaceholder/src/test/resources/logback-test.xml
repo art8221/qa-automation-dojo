@@ -3,12 +3,15 @@
 
     <appender name="CONSOLE" class="ch.qos.logback.core.ConsoleAppender">
         <encoder>
-            <pattern>%d{HH:mm:ss.SSS} [%thread] %-5level %logger{20} - %msg%n</pattern>
+            <pattern>%d{HH:mm:ss.SSS} [%thread] %highlight(%-5level) %cyan(%logger{30}) - %msg%n</pattern>
         </encoder>
     </appender>
 
+    <!-- Только важные логи -->
     <logger name="com.dojo.jsonplaceholder" level="INFO"/>
-    <logger name="io.restassured" level="INFO"/>
+
+    <!-- Отключаем логи RestAssured (они будут через наш фильтр) -->
+    <logger name="io.restassured" level="WARN"/>
 
     <root level="WARN">
         <appender-ref ref="CONSOLE"/>

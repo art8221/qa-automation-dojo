@@ -1,39 +1,31 @@
 ﻿package com.dojo.jsonplaceholder.tests
 
-import io.restassured.RestAssured.given
+import com.dojo.jsonplaceholder.annotations.ParallelApiTest
+import io.qameta.allure.Description
+import io.restassured.RestAssured
 import io.restassured.http.ContentType.JSON
-import jdk.jfr.Description
-import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.Assertions.assertEquals
+import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.assertAll
 
+@ParallelApiTest
 class JsonPlaceholderFirstTests {
 
     @Test
-    @Description("POST: Возвращение корректной информации")
+    @Description("GET: Возвращение корректной информации")
     fun `GET post by id should return correct data`() {
-        val post = given()
-            .baseUri("https://jsonplaceholder.typicode.com")
+        val post = RestAssured.given()
             .contentType(JSON)
-            .`when`()
             .get("/posts/1")
             .then()
             .statusCode(200)
             .extract()
             .`as`(Map::class.java)
 
-        val expectedId = 1
-
-        val expectedTitle = "sunt aut facere repellat provident occaecati excepturi optio reprehenderit"
-
-        assertAll(
-            "Проверки данных поста",
-            { assertEquals(expectedId, post["id"], "ID не соответствует ожидаемому, " +
-                    "ожидается - '$expectedId'," +
-                    "фактически - '${post["id"]}'") },
-            { assertEquals(expectedTitle, post["title"], "Заголовок не соответствует ожидаемому, " +
-                    "ожидается - '$expectedTitle'," +
-                    "фактически - '${post["title"]}'") }
+        assertEquals(1, post["id"])
+        assertEquals(
+            "sunt aut facere repellat provident occaecati excepturi optio reprehenderit",
+            post["title"]
         )
     }
 }

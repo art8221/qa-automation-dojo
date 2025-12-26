@@ -1,22 +1,34 @@
 package com.dojo.jsonplaceholder.extensions
 
+import com.dojo.jsonplaceholder.config.TestLoggingFilter
 import io.restassured.RestAssured
-import org.junit.jupiter.api.extension.BeforeAllCallback
+import org.junit.jupiter.api.extension.BeforeEachCallback
 import org.junit.jupiter.api.extension.ExtensionContext
 import org.slf4j.LoggerFactory
 
-class ParallelApiTestExtension  : BeforeAllCallback {
+class ParallelApiTestExtension : BeforeEachCallback {
 
     private val log = LoggerFactory.getLogger(ParallelApiTestExtension::class.java)
 
-    override fun beforeAll(context: ExtensionContext) {
-        // Простая базовая настройка RestAssured
-        RestAssured.baseURI = System.getProperty(
-            "api.base.url",
-            "https://jsonplaceholder.typicode.com"
-        )
+    // Храним имя теста для каждого потока
+    companion object {
+        private val currentTestName = ThreadLocal<String>()
 
-        log.info("✅ Tests configured for: ${context.displayName}")
-        log.info("Base URL: ${RestAssured.baseURI}")
+        fun getCurrentTestName(): String = currentTestName.get() ?: "UnknownTest"
+        fun setCurrentTestName(name: String) = currentTestName.set(name)
+    }
+
+    override fun beforeEach(context: ExtensionContext) {
+        // Сохраняем имя теста для этого потока
+        setCurrentTestName(context.displayName)
+
+        // Настраиваем RestAssured
+        RestAssured.baseURI = "https://jsonplaceholder.typicode.com"
+        RestAssured.enableLoggingOfRequestAndResponseIfValidationFails()
+
+        // Добавляем фильтр
+        RestAssured.filters(TestLoggingFilter())
+
+        log.info("✅ Настроен RestAssured для теста: ${context.displayName}")
     }
 }
